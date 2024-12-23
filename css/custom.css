@@ -1,0 +1,54 @@
+
+.jumbotron-logobackground{
+    background-image: url(../assets/img-lg/tectonic2.webp);
+    background-origin: content-box;
+    background-position: bottom right;
+    background-size: 35% 35%;
+    background-repeat: no-repeat;
+   }
+
+.carousel-caption{
+    background-color: rgba(64, 64, 64, 0.7);
+}
+
+.hoverhighlight:hover{
+    border:2px solid #F8F5F0;
+    background-image: url(../assets/img-lg/tectonic2.webp);
+    background-origin: content-box;
+    background-position: center center;
+    background-size: 90% 90%;
+    background-repeat: no-repeat;
+}
+
+.hoverhighlight{
+    border:2px solid #3E3F3A;
+}
+
+a:hover {
+    font-weight:bold;
+    text-decoration: none;
+}
+
+.zoom {
+    max-width: 100%;
+    object-fit: contain;
+    transition: transform .2s; /* Animation */
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    margin: 0 auto;
+  }
+  
+.zoom:hover {
+    transform: scale(1.02); /* (150% zoom - Note: if the zoom is too large, it will go outside of the viewport) */
+  }
+
+
+#hidethis { 
+    animation: css 0s 10s forwards; 
+}
+
+.transpbg {
+    background-color:rgba(255,255,255,0.8)
+}
+
+@keyframes css  { to { height: 0%; } }
+                    /* visibility / overflow: hidden; */

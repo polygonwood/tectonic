@@ -1,0 +1,1231 @@
+<!DOCTYPE html5>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tectonic solver">
+  <meta name="author" content="Ronny Dewaele">
+  <link rel="icon" href="assets/img-sm/favicon.ico">
+  <title>Tectonic solver</title>
+  <script src="jquery/jquery-3.5.1.min.js"></script>
+  <script src="bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/konva@8/konva.min.js"></script>
+  <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/custom.css" rel="stylesheet">
+  <style>
+    #jumbotronbackground {
+      background: url("assets/img-lg/tectonic2.webp") no-repeat center;
+      background-size: cover;
+    }
+  </style>
+  <script>
+    $(document).ready(function () {
+      $(".navbar a").on('click', function (event) {
+        if (this.hash !== "" && this.hash !== "#carouselSponsors") {
+          event.preventDefault();
+          var hash = this.hash;
+          $('html, body').animate({
+            scrollTop: $(hash).offset().top - 150
+          }, 800, function () {
+            window.location.hash = hash;
+          });
+        }
+      });
+    });
+  </script>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-sm navbar-dark bg-dark pt-2 sticky-top">
+    <a class="navbar-brand" href="#">
+      <div class="row">
+        <div>
+          <img src="assets/img-sm/Polygonwood-BV.png" style="height:5rem;">
+        </div>
+        <div class="ml-4 my-auto">
+          <h5 class="text-center">Tectonic Solver</h5>
+        </div>
+      </div>
+    </a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarRB" aria-controls="navbarRB"
+      aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <!-- <div class="collapse navbar-collapse" id="navbarRB">
+      <ul class="navbar-nav m-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="#contactus">
+            <h6 class="text-white">Contact</h6>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#activiteiten">
+            <h6 class="text-white">Activiteiten</h6>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#sponsors">
+            <h6 class="text-white">Sponsors</h6>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="historiek.html">
+            <h6 class="text-white">Geschiedenis</h6>
+          </a>
+        </li>
+      </ul>
+    </div> -->
+  </nav>
+  <div class="container-fluid h-100" id="jumbotronbackground">
+    <div class="row h-100">
+      <div class="col-12 col-sm-11 col-md-8 col-lg-6 m-auto">
+        <!-- <div class="jumbotron jumbotron-logobackground transpbg"> -->
+
+        <!-- <hr class="my-4"> -->
+        <button id="clearbutton" onclick="clearBoard()">Clear</button>
+        <button id="loadbutton" onclick="loadTectonic()">Load</button>
+        <button id="solvebutton" onclick="tectonicSolver()">Solve</button>
+        <button id="smaller" onclick="smallerBoard()">Smaller</button>
+        <button id="wider" onclick="widerBoard()">Wider</button>
+        <div class="d-flex justify-content-center py-4">
+          <div id="container"></div>
+          <script>
+            // var width = window.innerWidth;
+            // var height = window.innerHeight;
+            var width = 800;
+            var height = 500;
+            let colors = ['red', 'orange', 'purple', 'green', 'blue'];
+            // let strokeColors = ['darkred', 'darkorange', 'darkyellow', 'darkgreen', 'darkblue'];
+            let strokeColors = ['black', 'black', 'black', 'black', 'black'];
+            let cellWidth = 50;
+            let rows = 7, cols = 6;
+            let offsetLeft = 20;
+            let complete = false, waitMouse = false;
+
+            var stage = new Konva.Stage({
+              container: 'container',
+              width: width,
+              height: height,
+            });
+
+            var layer = new Konva.Layer();
+            var gridLayer = new Konva.Layer();
+            var textGroup = new Konva.Group({
+              id: 'text'
+            });
+            var valueGroup = new Konva.Group({
+              id: 'value'
+            });
+
+            function initialValue(x, y, val) {
+              grid[x][y].value = val;
+              let valueText = new Konva.Text({
+                y: offsetLeft + x * cellWidth + cellWidth / 2,
+                x: offsetLeft + y * cellWidth + cellWidth / 2,
+                text: val.toString(),
+                fontSize: 30,
+                fontFamily: 'Calibri',
+                fill: 'white',
+              });
+              if (grid[x][y].valueText) {
+                grid[x][y].valueText.remove();
+                grid[x][y].valueText.destroy();
+              }
+              grid[x][y].valueText = valueText;
+              valueText.offsetX(valueText.width() / 2);
+              valueText.offsetY(valueText.height() / 2);
+              // valueText.on('wheel', function (e) {
+              //   e.evt.preventDefault();
+              // });
+              valueGroup.add(valueText);
+              layer.draw();
+            }
+
+            function newRect(x, y, i, j, drag, color) {
+              // console.log('new rect', x, y, drag, color);
+              let rect = new Konva.Rect({
+                x: x,
+                y: y,
+                id: color.toString(),
+                fill: colors[color],
+                strokeEnabled: true,
+                stroke: 'lightgray',
+                strokeWidth: 1,
+                draggable: drag,
+                width: cellWidth,
+                height: cellWidth,
+              });
+              rect.setAttr('row', i);
+              rect.setAttr('col', j);
+              return rect;
+            }
+
+            function groupColor(group, color) {
+              let elems = group.getChildren(function (node) {
+                return node.getClassName() === 'Rect';
+              });
+              elems.forEach(function (elem) {
+                elem.setAttr('fill', colors[color]);
+              });
+            }
+
+            function adjacentGroup(group, i, j) {
+              let elems = group.getChildren(function (node) {
+                return node.getClassName() === 'Rect';
+              });
+              let neighbour = false;
+              elems.forEach(function (elem) {
+                let row = elem.getAttr('row');
+                let col = elem.getAttr('col');
+                if (row == i && Math.abs(col - j) == 1) neighbour = true;
+                if (col == j && Math.abs(row - i) == 1) neighbour = true;
+              });
+              return neighbour;
+            }
+
+            function hasCommonSide(pList, p1, p2) {
+              // console.log('common side',pList,p1,p2);
+              for (let i = 1; i < 4; ++i) {
+                let prev1 = pList.find(function (p) {
+                  if (p.id == p1.id && p.rank == ((p1.rank + i) % 4)) return true;
+                });
+                let prev2 = pList.find(function (p) {
+                  if (p.id == p2.id && p.rank == ((4 + p2.rank - i) % 4)) return true;
+                });
+                // console.log('prev',prev1,prev2);
+                if (prev1.x == prev2.x && prev1.y == prev2.y) return true;
+              }
+              return false;
+            }
+
+            function contourGroup(group) {
+              let elems = group.getChildren(function (node) {
+                return node.getClassName() === 'Rect';
+              });
+              let leftmost = elems[0];
+              for (let i = 0; i < elems.length; ++i) {
+                if (elems[i].x() < leftmost.x()) leftmost = elems[i];
+              }
+              let firstPoint = {
+                id: leftmost.id(), x: leftmost.x(), y: leftmost.y(), rank: 0, xDraw: leftmost.x() + 5, yDraw: leftmost.y() + 5, rect: leftmost,
+                first: { x: leftmost.x() + 5, y: leftmost.y() + 10 }, second: { x: leftmost.x() + 10, y: leftmost.y() + 5 }
+              };
+              let allPoints = [];
+              elems.forEach(function (elem) {
+                let x = elem.x(), y = elem.y(), id = elem.id();
+                // if (!(firstPoint.id == id && firstPoint.x == x && firstPoint.y == y)) {
+                // allPoints.push({ id: id, x: x, y: y, rank: 0, xDraw: x + 1, yDraw: y + 1, rect: elem });
+                // allPoints.push({ id: id, x: x + cellWidth, y: y, rank: 1, xDraw: x + cellWidth - 1, yDraw: y + 1, rect: elem });
+                // allPoints.push({ id: id, x: x + cellWidth, y: y + cellWidth, rank: 2, xDraw: x + cellWidth - 1, yDraw: y + cellWidth - 1, rect: elem });
+                // allPoints.push({ id: id, x: x, y: y + cellWidth, rank: 3, xDraw: x + 1, yDraw: y + cellWidth - 1, rect: elem });
+                allPoints.push({
+                  id: id, x: x, y: y, rank: 0, xDraw: x + 5, yDraw: y + 5, rect: elem,
+                  first: { x: x + 5, y: y + 10 }, second: { x: x + 10, y: y + 5 }
+                });
+                allPoints.push({
+                  id: id, x: x + cellWidth, y: y, rank: 1, xDraw: x + cellWidth - 5, yDraw: y + 5, rect: elem,
+                  first: { x: x + cellWidth - 10, y: y + 5 }, second: { x: x + cellWidth - 5, y: y + 10 }
+                });
+                allPoints.push({
+                  id: id, x: x + cellWidth, y: y + cellWidth, rank: 2, xDraw: x + cellWidth - 5, yDraw: y + cellWidth - 5, rect: elem,
+                  first: { x: x + cellWidth - 5, y: y + cellWidth - 10 }, second: { x: x + cellWidth - 10, y: y + cellWidth - 5 }
+                });
+                allPoints.push({
+                  id: id, x: x, y: y + cellWidth, rank: 3, xDraw: x + 5, yDraw: y + cellWidth - 5, rect: elem,
+                  first: { x: x + 10, y: y + cellWidth - 5 }, second: { x: x + 5, y: y + cellWidth - 10 }
+                });
+
+                // }
+              });
+              let origPoints = allPoints;
+              let lastPoint = firstPoint, contour = [];
+              do {
+                contour.push(lastPoint);
+                // remove lastPoint from list
+                allPoints = allPoints.filter(function (point) {
+                  if (!(point.id == lastPoint.id && point.x == lastPoint.x && point.y == lastPoint.y)) return true;
+                });
+                // let neighbour = allPoints.find(function (point) {
+                //   if (point.id != lastPoint.id && (point.x == lastPoint.x && point.y == lastPoint.y)) return true;
+                // }
+                let neighbours = allPoints.filter(function (point) {
+                  if (point.id != lastPoint.id && (point.x == lastPoint.x && point.y == lastPoint.y)) return true;
+                });
+                if (neighbours.length) {
+                  // console.log(neighbours);
+                  if (neighbours.length == 1) {
+                    let ref;
+                    if (contour[contour.length - 1].skip) {
+                      ref = contour.pop();
+                    }
+                    lastPoint = neighbours[0];
+                    lastPoint.neighbour = true;
+                    // contour[contour.length-1].neighbour = true;
+                    lastPoint.skip = false;
+                    lastPoint.ref = ref;
+                    // contour[contour.length-1].ref = ref;
+                  }
+                  else {
+                    for (let i = 0; i < neighbours.length; ++i) {
+                      if (hasCommonSide(origPoints, lastPoint, neighbours[i])) {
+                        lastPoint = neighbours[i];
+                        lastPoint.skip = true;
+                        lastPoint.neighbour = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+                else {
+                  lastPoint = allPoints.find(function (point) {
+                    if (point.id == lastPoint.id && point.rank == ((lastPoint.rank + 1) % 4)) return true;
+                    // && !(point.x == lastPoint.x && point.y == lastPoint.y)) return true;
+                  });
+                  if (lastPoint) {
+                    lastPoint.skip = false;
+                    lastPoint.neighbour = false;
+                    lastPoint.ref = lastPoint;
+                  }
+                }
+              }
+              while (lastPoint);
+              contour.push(firstPoint);
+              console.log('contour', contour);
+              // while (!(lastPoint.id == firstPoint.id && lastPoint.x == firstPoint.x && lastPoint.y == firstPoint.y));
+              // console.log('contour', contour);
+              // let linePoints = [];
+              // lastPoint = { x: -1, y: -1 };
+              // contour.forEach(function (point) {
+              //   // if (!(point.x == lastPoint.x && point.y == lastPoint.y)) {
+
+              //   linePoints.push(point.xDraw);
+              //   linePoints.push(point.yDraw);
+              //   lastPoint = point;
+              //   // }
+              // })
+              // let lines = group.getChildren(function (node) {
+              //   return node.getClassName() === 'Line';
+              // });
+              // lines.forEach(function (line) {
+              //   line.destroy();
+              // });
+              // let count = group.getChildren().length;
+              // let line = new Konva.Line({
+              //   points: linePoints,
+              //   stroke: strokeColors[count - 1],
+              //   strokeWidth: 2
+              // });
+              // group.add(line);
+              // line.moveToTop();
+              let shapes = group.getChildren(function (node) {
+                return node.getClassName() === 'Shape';
+              });
+              shapes.forEach(function (shape) {
+                shape.destroy();
+              });
+              var tect = new Konva.Shape({
+                sceneFunc: function (context, shape) {
+                  context.beginPath();
+                  let contour = shape.getAttr('contour');
+                  // console.log('contour shape', contour);
+                  // let rect = contour[0].rect;
+                  context.moveTo(contour[0].first.x, contour[0].first.y);
+                  if (contour[1].neighbour) {
+                    context.lineTo(contour[0].xDraw, contour[0].yDraw);
+                  }
+                  else {
+                    // context.moveTo(contour[0].first.x, contour[0].first.y);
+                    context.quadraticCurveTo(contour[0].xDraw, contour[0].yDraw, contour[0].second.x, contour[0].second.y);
+                    // console.log('quadratic', contour[0].xDraw, contour[0].yDraw, contour[0].second.x, contour[0].second.y);
+                  }
+                  // contour.shift();
+                  // contour.forEach(function (point) {
+                  for (let i = 1; i < contour.length; ++i) {
+                    let point = contour[i];
+                    // console.log('scene', point.rect.id(), rect.id());
+                    // if (point.rect.id() == rect.id()) {
+                    //   context.lineTo(point.xDraw, point.yDraw);
+                    //   console.log('line to', point.xDraw, point.yDraw)
+                    // }
+                    // else {
+                    //   context.quadraticCurveTo(point.x, point.y, point.xDraw, point.yDraw);
+                    //   console.log('curve to', point.x, point.y, point.xDraw, point.yDraw)
+                    // }
+                    // rect = point.rect
+                    if (!point.neighbour) {
+                      context.lineTo(point.first.x, point.first.y);
+                      if (contour[i + 1] && contour[i + 1].neighbour) context.lineTo(point.xDraw, point.yDraw);
+                      else if (contour[i + 1]) context.quadraticCurveTo(point.xDraw, point.yDraw, point.second.x, point.second.y);
+                    }
+                    else {
+                      if (point.ref) {
+                        context.quadraticCurveTo(point.ref.xDraw, point.ref.yDraw, point.xDraw, point.yDraw);
+                      }
+                      else context.lineTo(point.xDraw, point.yDraw);
+                      context.lineTo(point.second.x, point.second.y);
+                      // console.log('curve to', point.x, point.y, point.xDraw, point.yDraw)
+                    }
+                    // rect = point.rect
+                  }
+                  context.closePath();
+
+                  // (!) Konva specific method, it is very important
+                  context.fillStrokeShape(shape);
+                },
+                fill: '#00D2FF',
+                stroke: 'black',
+                strokeWidth: 2,
+              });
+              tect.setAttr('contour', contour);
+              group.add(tect);
+              tect.moveToTop();
+              tect.on('wheel', function (e) {
+                console.log('wheel on tect');
+              });
+            }
+
+            function countRect(group) {
+              let rects = group.getChildren(function (node) {
+                return node.getClassName() === 'Rect';
+              });
+              return rects.length;
+            }
+
+            function addRect(group, x, y) {
+              if (complete) return;
+              let i = Math.floor(y / cellWidth);
+              let j = Math.floor(x / cellWidth);
+              if (grid[i][j].empty) {
+                // console.log('i: ' + i + ', j: ' + j, grid[i][j].empty);
+                let rect = newRect(offsetLeft + x, offsetLeft + y, i, j, false, countRect(group));
+                // newGroup = new Konva.Group();
+                group.add(rect);
+                grid[i][j].empty = false;
+                grid[i][j].group = group;
+                if (countRect(group) > 1) groupColor(group, countRect(group) - 1);
+                contourGroup(group);
+                stage.batchDraw();
+              }
+            }
+
+            function addGroup(layer) {
+              let group = new Konva.Group({
+                id: 'tect'
+              });
+              layer.add(group);
+              return group;
+            }
+
+            function gridComplete(rows, cols) {
+              let completed = true;
+              for (let i = 0; i < rows; ++i) {
+                for (let j = 0; j < cols; ++j) {
+                  if (grid[i][j].empty) {
+                    completed = false;
+                    break;
+                  }
+                }
+                if (!completed) break;
+              }
+              if (completed) {
+                let groups = layer.getChildren(function (node) {
+                  return (node.getClassName() === 'Group') && (node.id() == 'tect');
+                });
+                console.log('completed', groups.length);
+                groups.forEach(function (group) {
+                  let rects = group.getChildren(function (node) {
+                    return node.getClassName() === 'Rect';
+                  });
+                  let size = rects.length;
+                  rects.forEach(function (rect) {
+                    let i = rect.getAttr('row');
+                    let j = rect.getAttr('col');
+                    grid[i][j].size = size;
+                  })
+                })
+              }
+              return completed;
+            }
+
+            function initGrid(rows, cols) {
+              grid = [];
+              gridLayer.destroyChildren();
+              // let nodes = gridLayer.getChildren();
+              // console.log('gridlayer nodes',nodes,nodes.length);
+              // nodes.forEach(function (node) {
+              //   console.log('destroying',node);
+              //   node.destroy();
+              // });
+              stage.draw();
+              console.log('gridlayer nodes after',gridLayer);
+              // valueGroup.getChildren().forEach(function (node) {
+              //   console.log('destroying',node);
+              //   node.destroy();
+              // });
+              // textGroup.getChildren().forEach(function (node) {
+              //   console.log('destroying',node);
+              //   node.destroy();
+              // });
+              complete = false;
+              for (var i = 0; i < rows; ++i) {
+                let row = [];
+                for (var j = 0; j < cols; ++j) {
+                  let id = i * 100 + j;
+                  let cell = new Konva.Rect({
+                    id: id.toString(),
+                    x: offsetLeft + j * cellWidth,
+                    y: offsetLeft + i * cellWidth,
+                    fill: 'lightgray',
+                    stroke: 'darkgray',
+                    strokeWidth: 2,
+                    draggable: false,
+                    width: cellWidth,
+                    height: cellWidth
+                  });
+                  gridLayer.add(cell);
+                  console.log('gridlayer add cell',gridLayer);
+                  let textCell = new Konva.Rect({
+                    id: id.toString(),
+                    x: offsetLeft + j * cellWidth,
+                    y: offsetLeft + i * cellWidth,
+                    opacity: 0,
+                    draggable: false,
+                    width: cellWidth,
+                    height: cellWidth
+                  });
+                  textCell.setAttr('row', i);
+                  textCell.setAttr('col', j);
+                  textGroup.add(textCell);
+                  row.push({
+                    id: id.toString(),
+                    empty: true,
+                    size: undefined,
+                    row: i,
+                    col: j,
+                    value: undefined,
+                    neighbours: [],
+                    potential: [],
+                    queued: false,
+                    group: undefined,
+                    valueCell: undefined
+                  });
+                  textCell.on('wheel', function (e) {
+                    e.evt.preventDefault();
+                    console.log('wheel on text cell', id);
+                  });
+                  textCell.on('wheel', function (e) {
+                    e.evt.preventDefault();
+                    if (complete) {
+                      e.cancelBubble = true;
+                      // textGroup.moveToTop();
+                    }
+                    if (complete && !waitMouse) {
+                      let row = this.getAttr('row');
+                      let col = this.getAttr('col');
+                      console.log('wheel!', grid[row][col]);
+                      waitMouse = true;
+                      let deltaY = e.evt.deltaY;
+                      let curVal = grid[row][col].value;
+                      let size = grid[row][col].size;
+                      if (deltaY < 0) {
+                        if (curVal) {
+                          if (curVal < size) ++grid[row][col].value;
+                        }
+                        else grid[row][col].value = 1;
+                      }
+                      else {
+                        if (curVal == 1) grid[row][col].value = undefined;
+                        else --grid[row][col].value;
+                      }
+                      if (grid[row][col].valueText) {
+                        grid[row][col].valueText.destroy();
+                        grid[row][col].valueText = undefined;
+                      }
+                      let newVal = grid[row][col].value;
+                      if (newVal) {
+                        let valueText = new Konva.Text({
+                          x: this.x() + cellWidth / 2,
+                          y: this.y() + cellWidth / 2,
+                          text: newVal.toString(),
+                          fontSize: 30,
+                          fontFamily: 'Calibri',
+                          fill: 'white',
+                        });
+                        grid[row][col].valueText = valueText;
+                        valueText.offsetX(valueText.width() / 2);
+                        valueText.offsetY(valueText.height() / 2);
+                        valueGroup.add(valueText);
+                      }
+                      stage.batchDraw();
+                      setTimeout(function () {
+                        waitMouse = false;
+                      }, 250);
+                    }
+                  });
+                  textCell.on('mousedown touchstart', function () {
+                    if (complete) return;
+                    // var mousePos = stage.getPointerPosition();
+                    let x = this.x() - offsetLeft;
+                    let y = this.y() - offsetLeft;
+                    let i = Math.floor(y / cellWidth);
+                    let j = Math.floor(x / cellWidth);
+                    if (grid[i][j].empty) {
+                      // console.log('i: ' + i + ', j: ' + j, grid[i][j].empty);
+                      let rect = newRect(this.x(), this.y(), i, j, false, 0);
+                      newGroup = new Konva.Group({
+                        id: 'tect'
+                      });
+                      newGroup.add(rect);
+                      // newGroup.on('dblclick dbltap', function () {
+                      //   let elems = this.getChildren(function (node) {
+                      //     return node.getClassName() === 'Rect';
+                      //   });
+                      //   elems.forEach(function (elem) {
+                      //     i = elem.getAttr('row');
+                      //     j = elem.getAttr('col');
+                      //     grid[i][j].empty = true;
+                      //   })
+                      //   this.destroy();
+                      //   if (complete) complete = false;
+                      // });
+                      // newGroup.on('wheel', function (e) {
+                      //   console.log('wheel on group');
+                      // });
+                      // newGroup.on('mouseup touchend', function () {
+                      //   adding = false;
+                      //   if (gridComplete(rows, cols)) complete = true;
+                      // });
+                      layer.add(newGroup);
+                      adding = true;
+                      grid[i][j].empty = false;
+                      grid[i][j].group = newGroup;
+                      console.log('cell contourgroup');
+                      contourGroup(newGroup);
+                      valueGroup.moveToTop();
+                      textGroup.moveToTop();
+                      stage.batchDraw();
+                    }
+                  })
+                  textCell.on('mousemove', function () {
+                    if (complete) return;
+                    let mousePos = stage.getPointerPosition();
+                    let dx = Math.min(Math.abs(mousePos.x - this.x()), Math.abs(mousePos.x - (this.x() + cellWidth)));
+                    let dy = Math.min(Math.abs(mousePos.y - this.y()), Math.abs(mousePos.y - (this.y() + cellWidth)));
+                    if (adding && dx > 5 && dy > 5) {
+                      let x = this.x() - offsetLeft;
+                      let y = this.y() - offsetLeft;
+                      let i = Math.floor(y / cellWidth);
+                      let j = Math.floor(x / cellWidth);
+                      // avoid diagonal move
+                      if (grid[i][j].empty && adjacentGroup(newGroup, i, j)) {
+                        // console.log('move i: ' + i + ', j: ' + j, grid[i][j].empty);
+                        let rect = newRect(this.x(), this.y(), i, j, false, countRect(newGroup));
+                        groupColor(newGroup, countRect(newGroup));
+                        newGroup.add(rect);
+                        grid[i][j].empty = false;
+                        grid[i][j].group = newGroup;
+                        if (countRect(newGroup) == 5) {
+                          adding = false;
+                        }
+                        contourGroup(newGroup);
+                        if (gridComplete(rows, cols)) complete = true;
+                        stage.batchDraw();
+                      }
+                      // else adding = false;
+                    }
+                  });
+                  textCell.on('mouseup touchend', function () {
+                    adding = false;
+                    if (gridComplete(rows, cols)) complete = true;
+                  });
+                  textCell.on('dblclick dbltap', function (e) {
+                    let group = grid[this.getAttr('row')][this.getAttr('col')].group;
+                    let elems = group.getChildren(function (node) {
+                      return node.getClassName() === 'Rect';
+                    });
+                    elems.forEach(function (elem) {
+                      i = elem.getAttr('row');
+                      j = elem.getAttr('col');
+                      console.log(elem, grid[i][j]);
+                      // return;
+                      grid[i][j].empty = true;
+                      grid[i][j].group = undefined;
+                      if (grid[i][j].valueText) {
+                        grid[i][j].valueText.remove();
+                        grid[i][j].valueText.destroy();
+                        grid[i][j].valueText = undefined;
+                      }
+                      if (grid[i][j].value) grid[i][j].value = undefined;
+                    })
+                    group.destroy();
+                    if (complete) complete = false;
+                    stage.draw();
+                    console.log(grid);
+                  });
+                }
+                grid.push(row);
+              }
+              console.log('grid', grid,gridLayer);
+            }
+
+            let grid = [];
+            let newGroup;
+            let adding = false;
+            // add the layer to the stage
+            layer.add(valueGroup);
+            layer.add(textGroup);
+            stage.add(gridLayer);
+            stage.add(layer);
+            stage.draw();
+            initGrid(rows, cols);
+
+            // stage.on('mouseup touchend', function () {
+            //   // console.log('mouseup on layer');
+            //   adding = false;
+            // });
+            // stage.on('wheel', function () {
+            //   console.log('wheel on stage');
+            //   // adding = false;
+            // });
+
+
+            function union(a, b) {
+              let setA = new Set(a);
+              let setB = new Set(b);
+              let union = new Set([...setA, ...setB]);
+              return Array.from(union);
+            }
+
+            function difference(a1, a2) {
+              let a2Set = new Set(a2);
+              return a1.filter(function (x) { return !a2Set.has(x); });
+            }
+
+            function sleep(ms) {
+              return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            class Element {
+              constructor(coord, size) {
+                this._x = coord[0];
+                this._y = coord[1];
+                this._value = undefined;
+                this._neighbours = [];
+                this._potential = [];
+                for (let i = 1; i <= size; ++i) {
+                  this._potential.push(i);
+                }
+                this._queued = false;
+              }
+
+              printelem() {
+                return '(' + this.x + ',' + this.y + ')'
+              }
+
+              get x() {
+                return this._x;
+              }
+
+              get y() {
+                return this._y;
+              }
+
+              addNeighbour(neighbour) {
+                this._neighbours.push(neighbour);
+              }
+
+              get neighbours() {
+                return this._neighbours;
+              }
+
+              get value() {
+                return this._value;
+              }
+
+              set value(value) {
+                this._value = value;
+              }
+
+              removePotential(value) {
+                this._potential = this._potential.filter(function (val) {
+                  if (val != value) return true;
+                });
+              }
+
+              get potential() {
+                return this._potential;
+              }
+
+              set queued(val) {
+                this._queued = val;
+              }
+
+              notQueued() {
+                return !this._queued;
+              }
+            }
+
+            class Block {
+
+              constructor(size, coords) {
+                this._size = size;
+                this.elemcoords = coords;
+                this._targets = []
+                this.elems = []
+                for (let i = 0; i < this.size; ++i) {
+                  this._targets.push([]);
+                  this.elems.push(new Element(this.elemcoords[i], size))
+                }
+                for (let i = 0; i < this.size; ++i) {
+                  let targets = [];
+                  this.elems.forEach(function (elem) {
+                    targets.push(elem);
+                  });
+                  // console.log('targets',targets);
+                  this._targets[i] = targets;
+                }
+                // console.log('_targets',this._targets);
+
+              }
+
+              get targets() {
+                return this._targets;
+              }
+
+              printblock() {
+                let text = 'Block -' + this.size + '-';
+                this.elems.forEach(function (elem) {
+                  text += elem.printelem();
+                });
+                console.log(text);
+              }
+
+              get size() {
+                return this._size;
+              }
+
+              // set size(size) {
+              //   this.size = size;
+              // }
+
+              get elements() {
+                return (this.elems);
+              }
+
+              removeTarget(elem) {
+                // #print e.getX(),e.getY()
+                // #print self.targets
+                for (let i = 0; i < this._targets.length; ++i) {
+                  this._targets[i] = this._targets[i].filter(function (target) {
+                    if (!(elem === target)) return true;
+                  })
+                }
+                // for t in self.targets[:]:
+                // #print 'true'
+                // i = t.index(e)
+                // del t[i]
+                // #print self.targets
+              }
+
+              emptyTargetValue(value) {
+                this._targets[value - 1] = [];
+              }
+
+              removeTargetValue(elem, value) {
+                // console.log('block before',elem,this);
+                // if target value outside block size if will not have targets to start with for that value
+                if (value > this.size) return;
+                // print 'removetargetvalue',e.getX(),e.getY(),v
+                this._targets[value - 1] = this._targets[value - 1].filter(function (target) {
+                  // console.log('comp',target,elem,target===elem);
+                  if (!(target === elem)) return true;
+                })
+                // console.log('block after',this);
+              }
+            }
+
+            class Tectonic {
+
+              constructor(rows, columns) {
+                this.blocks = [];
+                this.total = 0;
+                this.columns = columns;
+                this.rows = rows;
+                // this.rosterBlock = [[Block(1,[0,0]) for j in range (1,rows+1)] for i in range(1,columns+1)]
+                // this.rosterElement = [[Element([0,0],0) for j in range (1,rows+1)] for i in range(1,columns+1)]
+                this.rosterBlock = [];
+                this.rosterElement = [];
+                return
+              }
+
+              append(block) {
+                this.blocks.push(block);
+                this.total += block.size;
+              }
+
+              printall() {
+                console.log('Total : ', this.total);
+                this.blocks.forEach(function (block) {
+                  block.printblock();
+                });
+              }
+
+              check() {
+                // fill roster with 0
+                let roster = [];
+                for (let i = 0; i < this.rows; ++i) {
+                  let row = [], rowB = [], rowE = [];
+                  for (let j = 0; j < this.columns; ++j) {
+                    row.push(0);
+                    rowB.push(0);
+                    rowE.push(0);
+                  }
+                  roster.push(row);
+                  this.rosterBlock.push(rowB);
+                  this.rosterElement.push(rowE);
+                }
+                // console.log('rosterblock',this.rosterBlock);
+
+                console.log('roster', roster);
+                // update roster for all block elements
+                this.blocks.forEach(function (block) {
+                  let elems = block.elements;
+                  elems.forEach(function (elem) {
+                    let x = elem.x;
+                    let y = elem.y;
+                    // console.log('elem', x, y);
+                    roster[x][y] = 1;
+                  });
+                });
+                // check if roster is complete
+                let error = false;
+                for (let i = 0; i < this.rows; ++i) {
+                  for (let j = 0; j < this.columns; ++j) {
+                    if (!roster[i][j]) {
+                      error = true;
+                      console.log('element', i, j, 'missing');
+                    }
+                  }
+                }
+                if (!error) {
+                  console.log('roster OK');
+                  // console.log('rosterblock', this.rosterBlock);
+
+                  let rB = this.rosterBlock;
+                  let rE = this.rosterElement;
+                  this.blocks.forEach(function (block) {
+                    let elems = block.elements;
+                    elems.forEach(function (elem) {
+                      let x = elem.x;
+                      let y = elem.y;
+                      // console.log('elem',x,y,block,elem);
+                      rB[x][y] = block;
+                      rE[x][y] = elem;
+                    });
+                  });
+                  console.log('rosterblock', this.rosterBlock);
+                }
+                return error
+              }
+
+              setNeighbours() {
+                let deltas = [{ x: -1, y: 0 }, { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
+                { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { x: -1, y: 1 }];
+                let that = this;
+                for (let x = 0; x < this.rows; ++x) {
+                  for (let y = 0; y < this.columns; ++y) {
+                    deltas.forEach(function (d) {
+                      let nx = x + d.x;
+                      let ny = y + d.y;
+                      if (nx >= 0 && nx < that.rows && ny >= 0 && ny < that.columns) {
+                        // console.log(that.rosterBlock[x][y],that.rosterBlock[nx][ny],that.rosterBlock[x][y] === that.rosterBlock[nx][ny]);
+                        if (!(that.rosterBlock[x][y] === that.rosterBlock[nx][ny])) {
+                          // console.log('adding neighbour for',x,y);
+                          that.rosterElement[x][y].addNeighbour(that.rosterElement[nx][ny]);
+                        }
+                      }
+                    })
+                  }
+                }
+                // console.log('block', this.blocks);
+                // console.log('rosterblock', this.rosterBlock);
+                // console.log('rosterelem', this.rosterElement);
+              }
+
+              printNeighbour(x, y) {
+                elem = this.rosterElement[x][y];
+                let text = 'Neighbours for ' + x + ',' + y;
+                elem.neighbours.forEach(function (elem) {
+                  text += ' - ' + elem.x + ',' + elem.y;
+                });
+                console.log(text);
+              }
+
+              printRoster() {
+                console.log('-------------------------------------------------------------------------------');
+                for (let x = 0; x < this.rows; ++x) {
+                  let text = '';
+                  for (let y = 0; y < this.columns; ++y) {
+                    let value = this.rosterElement[x][y].value;
+                    if (value) text += value.toString();
+                    else text += ' [' + this.rosterElement[x][y].potential.toString() + ']';
+                  }
+                  console.log(text);
+                }
+              }
+
+              fillValue(x, y, val) {
+                console.log('Filling', x, y, 'with', val);
+                initialValue(x, y, val);
+                let elemVal = this.rosterElement[x][y];
+                elemVal.value = val;
+                elemVal.queued = true;
+                // remove the set value from potential value list of all other elements of same block
+                let elems = this.rosterBlock[x][y].elements;
+                elems.forEach(function (elem) {
+                  if (!(elem === elemVal)) elem.removePotential(val);
+                })
+                // remove element from target list of all values of block
+                this.rosterBlock[x][y].removeTarget(this.rosterElement[x][y]);
+                // clear target list of the element with the set value of the block
+                this.rosterBlock[x][y].emptyTargetValue(val);
+                // remove the set value of potential value list of all neighbours
+                elemVal.neighbours.forEach(function (elem) {
+                  elem.removePotential(val);
+                });
+                // and remove the neighbour elements from the target list of their block for that value
+                let that = this;
+                elemVal.neighbours.forEach(function (elem) {
+                  that.rosterBlock[elem.x][elem.y].removeTargetValue(elem, val);
+                });
+              }
+
+              checkNeighbours() {
+                // when do we have to do this ?
+                // remove potential values of intersect of potential values of neighbours of same block that do not appear as potential of other elements 
+                // of that neighbour block (in other words that uniquely appear a864s potential value for all neighbours of same block)
+                // stupidly we do it for all elements and all neighbours because we didn't keep track of a list of neighbour blocks to optimize this step
+                let that = this;
+                for (let x = 0; x < this.rows; ++x) {
+                  for (let y = 0; y < this.columns; ++y) {
+                    if (!this.rosterElement[x][y].notQueued()) continue;
+                    this.rosterElement[x][y].neighbours.forEach(function (neighbour) {
+                      if (!neighbour.notQueued()) return;
+                      let commonVal = neighbour.potential;
+                      // determine block via rosterBlock
+                      let block = that.rosterBlock[neighbour.x][neighbour.y];
+                      // collect other neighbours of same block (via rosterBlock or via running over neighbours)
+                      that.rosterElement[x][y].neighbours.forEach(function (otherNeighbour) {
+                        if (!(neighbour === otherNeighbour)) { // different Neighbour !
+                          let otherNeighbourBlock = that.rosterBlock[otherNeighbour.x][otherNeighbour.y];
+                          if (otherNeighbourBlock === block && otherNeighbour.notQueued()) { // from same block and without finale value yet
+                            // determine cross section of potential values of neighbours of that block
+                            commonVal = union(commonVal, otherNeighbour.potential);
+                            // console.log(neighbour,otherNeighbour,commonVal);
+                          }
+                        }
+                      });
+                      // reduce further with values that still appear as value of other elements of neighbour block
+                      block.elements.forEach(function (blockElement) {
+                        if (blockElement.notQueued() && !that.rosterElement[x][y].neighbours.includes(blockElement)) {
+                          // it's not a neighbour and has not yet final value set
+                          commonVal = difference(commonVal, blockElement.potential);
+                          // console.log(neighbour,blockElement,commonVal);
+                        }
+                      });
+                      // reduce final list from potential list of element at hand
+                      commonVal.forEach(function (val) {
+                        that.rosterElement[x][y].removePotential(val);
+                        that.rosterBlock[x][y].removeTargetValue(neighbour, val);
+                        console.log('Reduction', x, y, 'with', neighbour.x, neighbour.y, 'value', val, that.rosterBlock[x][y].targets[val - 1]);
+                      });
+                    })
+                  }
+                }
+              }
+
+              checkNewValues() {
+                // targets with only 1 candidate ?
+                let that = this;
+                this.blocks.forEach(function (block) {
+                  let targets = block.targets;
+                  for (let t = 0; t < block.size; ++t) {
+                    if (targets[t].length == 1) {
+                      let elem = targets[t][0];
+                      if (elem.notQueued()) {
+                        console.log('AAA new value at', elem.x, elem.y, 'value', t + 1);
+                        that.vq.push({ x: elem.x, y: elem.y, value: t + 1 });
+                        elem.queued = true;
+                      }
+                    }
+                  }
+                  let elems = block.elements;
+                  elems.forEach(function (elem) {
+                    if (elem.potential.length == 1) {
+                      if (elem.notQueued()) {
+                        let val = elem.potential[0];
+                        console.log('BBB new value at', elem.x, elem.y, 'value', val);
+                        that.vq.push({ x: elem.x, y: elem.y, value: val });
+                        elem.queued = true;
+                      }
+                    }
+                  });
+                });
+              }
+
+              solve(valueq) {
+                this.vq = valueq;
+                console.log('vq', this.vq);
+                this.checkNeighbours();
+                this.checkNewValues();
+                console.log('blocks', this.blocks);
+                // return;
+                while (this.vq.length) {
+                  console.log(this.vq);
+                  let next = valueq[0];
+                  this.vq.shift();
+                  this.fillValue(next.x, next.y, next.value);
+                  // console.log('blocks', this.blocks);
+                  this.checkNewValues();
+                  if (this.vq.length) {
+                    this.checkNeighbours();
+                    // return;
+                    this.checkNewValues();
+                  }
+                }
+              }
+            }
+
+            function addTile(coord) {
+              let group = addGroup(layer);
+              coord.forEach(function (rect) {
+                addRect(group, rect[0] * 50, rect[1] * 50);
+              })
+            }
+
+            function clearBoard() {
+              let groups = layer.getChildren(function (node) {
+                return (node.getClassName() === 'Group') && (node.id() == 'tect');
+              });
+              groups.forEach(function (group) {
+                group.remove();
+                group.destroy();
+              });
+              let texts = valueGroup.getChildren(function (node) {
+                return true;
+              });
+              texts.forEach(function (text) {
+                text.remove();
+                text.destroy();
+              });
+              adding = false;
+              initGrid(rows, cols);
+              stage.draw();
+            }
+
+            function smallerBoard() {
+              if (cols > 2) --cols;
+              clearBoard();
+            }
+
+            function widerBoard() {
+              if (cols < 10) ++cols;
+              clearBoard();
+            }
+
+            function loadTectonic() {
+              // addTile([[0, 0], [1, 0], [1, 1], [2, 1], [1, 2]]);
+              // addTile([[2, 0], [3, 0], [4, 0], [3, 1], [3, 2]]);
+              // addTile([[5, 0], [4, 1], [5, 1], [4, 2], [5, 2]]);
+              // addTile([[0, 1], [0, 2]]);
+              // addTile([[2, 2], [2, 3], [3, 3], [4, 3], [5, 3]]);
+              // addTile([[0, 3], [1, 3], [0, 4], [1, 4], [0, 5]]);
+              // addTile([[2, 4], [3, 4], [2, 5], [3, 5]]);
+              // addTile([[4, 4], [5, 4], [4, 5], [5, 5], [4, 6]]);
+              // addTile([[1, 5], [0, 6], [1, 6], [2, 6], [3, 6]]);
+              // addTile([[5, 6]]);
+              addTile([[0, 0], [1, 0], [0, 1]]);
+              addTile([[2, 0], [3, 0], [1, 1], [2, 1], [3, 1]]);
+              addTile([[4, 0], [5, 0], [4, 1], [5, 1], [5, 2]]);
+              addTile([[0, 2], [1, 2], [0, 3], [1, 3], [2, 3]])
+              addTile([[2, 2], [3, 2], [4, 2], [3, 3], [4, 3]]);
+              addTile([[0, 4], [1, 4], [2, 4], [3, 4]]);
+              addTile([[5, 3], [4, 4], [5, 4], [4, 5], [5, 5]]);
+              addTile([[0, 5], [1, 5], [0, 6], [1, 6], [2, 6]]);
+              addTile([[2, 5], [3, 5], [3, 6], [4, 6], [5, 6]]);
+              stage.draw();
+
+              if (gridComplete(rows, cols)) {
+                complete = true;
+                // layer.add(textGroup);
+                valueGroup.moveToTop();
+                textGroup.moveToTop();
+                layer.draw();
+              }
+              // complete = true;
+              initialValue(0, 5, 5);
+              initialValue(1, 0, 3);
+              initialValue(1, 4, 3);
+              initialValue(2, 1, 5);
+              initialValue(2, 5, 4);
+              initialValue(3, 3, 1);
+              initialValue(5, 5, 3);
+              initialValue(6, 1, 1);
+              initialValue(6, 3, 1);
+              initialValue(6, 5, 2);
+              stage.draw();
+            }
+            function tectonicSolver() {
+              if (!complete) {
+                console.log('tectonic not complete to solve');
+                return;
+              }
+              t = new Tectonic(rows, cols);
+              let groups = layer.getChildren(function (node) {
+                return (node.getClassName() === 'Group') && (node.id() == 'tect');
+              });
+              groups.forEach(function (group) {
+                let rects = group.getChildren(function (node) {
+                  return node.getClassName() === 'Rect';
+                });
+                let size = rects.length;
+                let coords = [];
+                rects.forEach(function (rect) {
+                  let row = rect.getAttr('row');
+                  let col = rect.getAttr('col');
+                  coords.push([row, col]);
+                });
+                // console.log('new block',size,coords);
+                let block = new Block(size, coords);
+                console.log('new block', block);
+                t.append(block);
+              });
+              t.printall();
+              if (t.check()) return;
+              t.setNeighbours()
+              t.printRoster()
+              let valueQ = [];
+              for (let i = 0; i < rows; ++i) {
+                for (let j = 0; j < cols; ++j) {
+                  if (grid[i][j].value) valueQ.push({
+                    x: i,
+                    y: j,
+                    value: grid[i][j].value
+                  })
+                }
+              }
+              console.log(valueQ);
+              // valueq = [[1,1,1],[7,1,4],[2,3,3],[4,3,2],[7,4,1],[3,5,4],[6,5,2],[1,6,3],[4,6,1],[7,6,4],[5,7,4],[2,8,1],[8,8,4]]
+              t.solve(valueQ)
+              t.printRoster()
+            }
+          </script>
+        </div>
+        <!-- </div> -->
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
